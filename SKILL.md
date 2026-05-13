@@ -111,6 +111,51 @@ add-container(parent_id="<flex-row-parent>", settings={
 
 The parent flex row itself can stay `content_width: "boxed"` — that's fine for the row's outer wrapper. Only the flex CHILDREN need `"full"`.
 
+## Flex sizing — pair `_flex_grow` with `_flex_size: "none"`
+
+When a row flex container has one child that should fill remaining space (e.g. a content column next to a fixed-width badge), giving that child `_flex_grow: "1"` is only half the fix. Elementor's default flex behavior on the *other* children is to shrink — so the badge collapses to zero width when its sibling grows.
+
+**Always set both sides:**
+- The growing child: `_flex_size: "grow"` + `_flex_grow: "1"`
+- The fixed-size sibling(s): `_flex_size: "none"`
+
+**Worked example — tier card with badge + content column:**
+
+```
+# Row flex card container has two children: a badge image and a content column.
+
+# Badge image — fixed size, don't shrink:
+update-element(element_id="<badge-img-id>", settings={
+  "_element_custom_width": {"unit": "px", "size": 80, "sizes": []},
+  "_flex_size": "none",
+  ...gradient + radius settings...
+})
+
+# Content column — grow into remaining space:
+update-container(element_id="<content-col-id>", settings={
+  "_flex_size": "grow",
+  "_flex_grow": "1"
+})
+```
+
+Symptom of forgetting the `"none"`: the fixed-size sibling visually disappears or becomes a sliver. If you see that, the growing partner is starving it.
+
+## Column containers default to `flex_align_items: "center"` — set it explicitly
+
+A flex column container created without an explicit `flex_align_items` gets `"center"` injected by Elementor. That centers each child widget *as a block* within the column — which makes any `align: "left"` setting on a heading or text-editor inside it look like it's doing nothing. The text alignment IS being set, but the WIDGET WRAPPER is centered, so left-aligned text inside a narrow centered wrapper still appears centered on the page.
+
+**Always set `flex_align_items: "stretch"` on column containers whose children should fill the column's width.**
+
+```
+add-container(parent_id="<parent>", settings={
+  "flex_direction": "column",
+  "flex_align_items": "stretch",   # ← otherwise Elementor injects "center"
+  ...
+})
+```
+
+Symptom: a heading or text-editor inside a flex-column container appears horizontally centered no matter how many times you set `align: "left"` on it via `update-element`. The fix is on the container, not the widget.
+
 ## Custom CSS — fallback only
 
 `add-custom-css` is the escape hatch, not the workhorse. Use it only when the styling has no native control:
@@ -212,6 +257,8 @@ This preserves the parent container's styling (background, padding, layout) and 
 | Forgetting `agent-browser set viewport` | Always set to 1280×800 (or wider) before screenshotting desktop layouts |
 | Putting layout-affecting CSS in custom-css blocks | If there's a native control (padding, margin, flex), use it via update-element |
 | Treating `add-custom-css` as primary, `update-element` as fallback | Inverse: native first, CSS only when no native control exists |
+| Giving a flex child `_flex_grow: "1"` without setting `_flex_size: "none"` on its fixed sibling | Pair them — see "Flex sizing" above. Symptom: the fixed sibling visually disappears. |
+| Creating a flex-column container without explicit `flex_align_items` | Set `flex_align_items: "stretch"` explicitly — Elementor injects `"center"` otherwise, which silently breaks any `align: "left"` on child widgets. |
 
 ## Key tool reference
 
