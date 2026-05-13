@@ -11,10 +11,11 @@ Most pain when building Elementor pages via MCP comes from one mistake: dropping
 
 1. **Read the source artifact first.** PDF, Figma, sketch, brief — whatever's authoritative for content and design. Don't guess.
 2. **Get the site's global kit.** Call `elementor-mcp-get-global-settings` before placing the first container. It returns Primary/Secondary/Accent/Text colors and H1/H2/body typography — the source of truth for brand. Use these via `__globals__` references rather than redefining colors per element, so kit edits cascade.
-3. **Narrate the layout before any build call.** Decompose into sections → containers → widgets → settings in prose. Catches design mistakes before they're 20 `add-*` calls deep, and turns the eventual implementation into a transcription rather than a design exercise.
-4. **Create the page as draft first.** `elementor-mcp-create-page` with `status: "draft"`. Pick the right page template (see [Page template choice](#page-template-choice)).
-5. **Build sections incrementally.** Container → its children → next container. Don't try to one-shot the whole page through `build-page` — small steps make iteration cheap.
-6. **Publish, then visual review.** Use `agent-browser` (see [Visual review](#visual-review-with-agent-browser)). Compare against the source for both rendering glitches AND content fidelity. Iterate per-section using `update-element`, `update-container`, or `add-custom-css`.
+3. **Check the kit's baseline CSS.** Inspect `settings.custom_css` from the global settings response. If the [kit-baseline rules](#kit-level-css-conventions) aren't present (and there's no opt-out marker), propose adding them to the user before building. This is a one-time per-site check — once the baseline is in place, you skip this step on subsequent sessions.
+4. **Narrate the layout before any build call.** Decompose into sections → containers → widgets → settings in prose. Catches design mistakes before they're 20 `add-*` calls deep, and turns the eventual implementation into a transcription rather than a design exercise.
+5. **Create the page as draft first.** `elementor-mcp-create-page` with `status: "draft"`. Pick the right page template (see [Page template choice](#page-template-choice)).
+6. **Build sections incrementally.** Container → its children → next container. Don't try to one-shot the whole page through `build-page` — small steps make iteration cheap.
+7. **Publish, then visual review.** Use `agent-browser` (see [Visual review](#visual-review-with-agent-browser)). Compare against the source for both rendering glitches AND content fidelity. Iterate per-section using `update-element`, `update-container`, or `add-custom-css`.
 
 ## The two-step widget pattern
 
@@ -215,6 +216,104 @@ After each visual-review pass, decide:
 | Content page integrated with site nav | omit or `template: "default"` |
 
 Set via `elementor-mcp-update-page-settings` after page creation. Use canvas for one-sheets, pitch decks, sales pages; default for content/blog pages.
+
+## Kit-level CSS conventions
+
+A small set of CSS rules belongs in Kit → Site Settings → Custom CSS rather than on individual widgets. They're defensive overrides that almost always improve an Elementor site: applied once at the kit level, they cover every widget, every page, every future addition.
+
+**The baseline rules:**
+
+```css
+/* Drop trailing margin on the last paragraph of a text-editor widget — keeps
+   the widget's bottom edge flush with its container's bottom padding. */
+.elementor-widget-text-editor .elementor-widget-container > p:last-child {
+  margin-bottom: 0;
+}
+
+/* Symmetric: drop leading margin on the first paragraph too. */
+.elementor-widget-text-editor .elementor-widget-container > p:first-child {
+  margin-top: 0;
+}
+
+/* Accessibility: visible keyboard-focus outline on links inside Elementor.
+   Hello Elementor and many themes hide the default focus ring. */
+.elementor a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+```
+
+The `.elementor-widget-container >` direct-child combinator is important — it scopes the margin reset to top-level paragraphs in the widget, leaving nested paragraphs inside lists/blockquotes alone.
+
+### The workflow check (step 3 of [Workflow](#workflow))
+
+On your first interaction with an Elementor site, after `get-global-settings`, look at `settings.custom_css`. Decide whether to propose the baseline:
+
+1. **Opt-out marker present** — if `custom_css` contains the substring `skill-baseline: opt-out` (e.g. as a comment), skip the check entirely. The site owner explicitly declined the baseline.
+2. **Baseline marker present** — if `custom_css` contains the substring `skill-baseline: applied`, the rules are already in place. Skip.
+3. **Otherwise** — diff the baseline rules against the existing CSS. Surface a short message to the user:
+   > "I noticed this site doesn't have the kit-baseline rules ([list which are missing]). They're defensive overrides for trailing paragraph margins and accessibility focus outlines. Want me to add them to Site Settings → Custom CSS?"
+   
+   On yes: apply via the mechanism below. On no: ask if they want to opt-out permanently (drops a comment so future sessions skip).
+
+**Propose and confirm, don't apply silently.** The kit is a shared resource that affects the whole site.
+
+### Applying the baseline
+
+You have two interchangeable paths. Both work; pick based on what's available in the session.
+
+**Path A — MCP (preferred when working in a Claude session):**
+
+Get the kit's post_id once, then update its `custom_css` like any other page setting:
+
+```bash
+wp option get elementor_active_kit
+# → e.g. 4
+```
+
+Then via MCP, passing the kit's post_id:
+
+```
+elementor-mcp-update-page-settings(post_id=<kit-id>, settings={
+  "custom_css": "<existing CSS>\n\n/* skill-baseline: applied */\n<the three rules>"
+})
+```
+
+Two caveats:
+- `elementor-mcp-get-global-settings` can return a cached snapshot. To verify a write, prefer `wp post meta get <kit-id> _elementor_page_settings` (full output, not truncated) over re-calling `get-global-settings`.
+- After writing, run `wp elementor flush_css` to regenerate Elementor's cached CSS files on disk. Without this, the new rules sit in the database but won't render on the front end.
+
+**Path B — direct WP-CLI (no MCP needed, fully reliable):**
+
+```bash
+KIT_ID=$(wp option get elementor_active_kit)
+wp eval '
+  $kit_id = '"$KIT_ID"';
+  $settings = get_post_meta($kit_id, "_elementor_page_settings", true) ?: [];
+  $existing = $settings["custom_css"] ?? "";
+  $baseline = "
+/* skill-baseline: applied */
+.elementor-widget-text-editor .elementor-widget-container > p:last-child { margin-bottom: 0; }
+.elementor-widget-text-editor .elementor-widget-container > p:first-child { margin-top: 0; }
+.elementor a:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+";
+  $settings["custom_css"] = trim($existing) . "\n\n" . trim($baseline) . "\n";
+  update_post_meta($kit_id, "_elementor_page_settings", $settings);
+'
+wp elementor flush_css
+```
+
+The `skill-baseline: applied` comment is the marker future sessions look for to know the rules are in place. **Always run `wp elementor flush_css` after either path** — Elementor caches kit CSS to disk; without flushing, the rules won't render until something else triggers a regen.
+
+### Opt-out
+
+If the user says no to the baseline (and "no" should mean "don't ask again on this site"), append the opt-out comment to the kit's custom_css. Use either Path A (MCP) or Path B (wp eval) from above — the only change is the appended string is `/* skill-baseline: opt-out */` instead of the rules block.
+
+Subsequent sessions will detect the marker and skip the check.
+
+### Per-rule opt-out
+
+If the user wants the baseline overall but objects to one specific rule (e.g. they like trailing paragraph margins for prose pages), don't apply that rule. Add only the rules they accept, and the marker comment. There's no need for a finer-grained marker — if the user wants to add a missing rule later, they can re-run the check.
 
 ## Element ID tracking
 
