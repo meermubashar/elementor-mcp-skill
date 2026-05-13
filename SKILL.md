@@ -7,6 +7,25 @@ description: Use this skill whenever you are working with an Elementor or Elemen
 
 Most pain when building Elementor pages via MCP comes from one mistake: dropping into HTML widgets the moment a styling argument is rejected by an `add-*` tool. The widgets accept much more than their strict `add-*` validators expose. The patterns below let you build pages that are visually faithful AND remain fully editable from the Elementor panel UI — which is the whole point of using Elementor.
 
+## Onboarding a new Elementor site
+
+If `mcp__*__elementor-mcp-*` tools are already available in this session, the site is wired up — skip to [Workflow](#workflow).
+
+If they're not, the user is starting fresh and you need to get the MCP plumbing in place. **See [`references/onboarding.md`](references/onboarding.md)** for the full flow:
+
+- **Detect framework** (Standard WP vs Bedrock) — install paths differ
+- **Install both MCP plugins** — `wordpress/mcp-adapter` foundation + `msrbuilds/elementor-mcp` for page-building tools. Standard WP path (wp-cli + zip from GitHub Releases) and Bedrock path (Composer + VCS repo) both documented
+- **Verify servers registered** with `wp mcp-adapter list`
+- **Write `.mcp.json`** — STDIO template (preferred for local sites) and HTTP template (for cloud/remote)
+- **First-session checklist** — plugins active, safe-svg role-gate open, kit ID identified, agent-browser viewport sized
+- **Memory templates** — three starter files to give every future session on this site a fast cold-start (project context, transport rationale, MEMORY.md index), plus guidance on project-level vs user-level memory placement
+
+One-line framework detection you can run at the project root:
+
+```bash
+test -f composer.json && grep -q '"roots/wordpress"' composer.json && echo BEDROCK || echo STANDARD
+```
+
 ## Workflow
 
 1. **Read the source artifact first.** PDF, Figma, sketch, brief — whatever's authoritative for content and design. Don't guess.
@@ -206,6 +225,19 @@ After each visual-review pass, decide:
 - **Rendering glitch?** → fix the offending element via `update-element` or `update-container`.
 - **Content gap vs source?** → add the missing piece.
 - **Both look right?** → mark this section done, move on.
+
+## Diagnostic agent-browser eval recipes
+
+When a screenshot looks wrong, screenshots themselves don't tell you *which CSS rule* is wrong. Six `agent-browser eval` recipes in **[`references/diagnostics.md`](references/diagnostics.md)** turn "why is this broken" investigations from a half-hour exercise into a 30-second answer:
+
+- **Selector match validation** — `document.querySelectorAll('selector').length` — verify every kit-CSS selector matches real markup before committing it
+- **Computed color** of an element, with interpretation table (`rgb(122,122,122)` = kit corrupted signal)
+- **Elementor global variable resolution** (`--e-global-color-*`)
+- **Cascade-winner finder** — which stylesheet rule is setting this property?
+- **CSS-variable definition finder** — where across the page is `--e-global-color-text` defined?
+- **Full-style sanity blob** — one call, all typography/spacing values for a widget
+
+The **selector-match check** is the most important — never write a CSS rule to a kit's `custom_css` without confirming it matches at least one element on a real page. A `0` return on a page with the target widget type means the selector is wrong.
 
 ## Page template choice
 
