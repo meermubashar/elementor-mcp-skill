@@ -35,7 +35,7 @@ wp plugin install --activate https://github.com/msrbuilds/elementor-mcp/releases
 
 Alternative: download zips and upload via Plugins → Add New → Upload Plugin in WP admin.
 
-### Bedrock — Composer for the adapter, VCS repo for elementor-mcp
+### Bedrock — Composer for the adapter, wp-cli zip for elementor-mcp
 
 ```bash
 cd <project-root>
@@ -43,16 +43,33 @@ cd <project-root>
 # 1. MCP adapter — clean Packagist install
 composer require wordpress/mcp-adapter
 
-# 2. Elementor MCP — add VCS source to composer.json first, then require
-#    composer.json should contain:
-#    "repositories": [
-#      { "type": "vcs", "url": "https://github.com/msrbuilds/elementor-mcp" }
-#    ]
-composer require msrbuilds/elementor-mcp:dev-main   # or a specific tag
+# 2. CRITICAL: run composer install inside the plugin directory too.
+#    mcp-adapter checks for its OWN vendor/autoload.php at
+#    web/app/plugins/mcp-adapter/vendor/autoload.php. Bedrock's
+#    project-level autoloader does NOT satisfy this check. If the
+#    plugin-level vendor/ is missing, Plugin::instance() silently bails
+#    and wp mcp-adapter list never registers — no error, just silence.
+cd web/app/plugins/mcp-adapter && composer install --no-dev && cd -
 
-# 3. Activate
-wp plugin activate mcp-adapter elementor-mcp
+# 3. Elementor MCP — install via wp-cli zip (VCS Composer approach fails
+#    because the repo's composer.json package name doesn't match what
+#    Packagist expects). Get the latest release asset URL first:
+LATEST=$(curl -s "https://api.github.com/repos/msrbuilds/elementor-mcp/releases/latest" \
+  | python3 -c "import json,sys; r=json.load(sys.stdin); print(r['assets'][0]['browser_download_url'])")
+wp plugin install --activate "$LATEST"
+
+# 4. Activate mcp-adapter (already activated for elementor-mcp above)
+wp plugin activate mcp-adapter
 ```
+
+Verify both servers registered:
+
+```bash
+wp mcp-adapter list
+# Expected: mcp-adapter-default-server (3 tools) + elementor-mcp-server (100+ tools)
+```
+
+If `wp mcp-adapter list` errors with "not a registered wp command", the plugin-level vendor/ is missing — run step 2 above.
 
 Check the [elementor-mcp README](https://github.com/msrbuilds/elementor-mcp) for the current install guidance — Packagist support may have been added since this reference was written.
 
