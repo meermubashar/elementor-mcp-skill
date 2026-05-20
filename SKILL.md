@@ -298,6 +298,7 @@ If you lose an ID, recover it with `elementor-mcp-get-page-structure` or `elemen
 | Setting `grid_columns_grid` without `grid_rows_grid` | Always set both axes. Omitting `grid_rows_grid` defaults to 2 rows, leaving an empty second row. Run the post-build eval to confirm — screenshots cannot catch this. See [Grid containers](#grid-containers--always-set-both-axes-explicitly). |
 | Omitting `_title` on top-level section containers | Set `_title` at creation time (e.g. `"_title": "Hero — Section"`). Costs nothing; makes the Elementor Navigator a readable page map instead of "Container / Container / Container." Inner containers and widgets don't need it. |
 | Wrong tag name or key format for ACF dynamic tags | Use `tag_name: "acf-text"` (not `"acf"`). The `key` setting must be `"field_key:field_name"` (colon-separated, e.g. `"field_page_eyebrow:page_eyebrow"`). Passing only the field key causes a PHP warning and the field still renders, but passing only the field name silently fails. Use `list-dynamic-tags` to confirm available tag names for the active ACF version. |
+| Assuming a user-edited element's structure from memory or conversation summaries | Call `get-page-structure` + `get-element-settings` on the reference element *before* building anything meant to match it. User hands-on edits introduce nesting depth, sub-container order, and setting details that no summary fully captures. The API is ground truth; summaries are hints. |
 
 ## Key tool reference
 
