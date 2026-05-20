@@ -36,6 +36,10 @@ This gives you the full content map without opening DevTools.
 
 `eval` runs arbitrary JavaScript in the browser context and returns the result. Use it to pull computed styles directly off elements — the browser has already resolved all CSS variables, inheritance, and cascade for you.
 
+### ⚠️ Always query child elements of headings
+
+`getComputedStyle(h1).color` returns the *inherited* color on the `<h1>` element itself. If the heading contains an `<em class="text-gold">` or `<span>` that overrides the color via a CSS class, the parent query will return the base color and the override will be invisible. **Always query `h1 em` and `h1 span` children separately.** The global-tokens recipe below already does this; apply the same pattern when inspecting individual sections.
+
 ### Extract global design tokens (run once per site)
 
 ```bash
@@ -48,8 +52,18 @@ JSON.stringify({
     size: getComputedStyle(document.body).fontSize,
     lineHeight: getComputedStyle(document.body).lineHeight
   },
-  h1: (() => { const el = document.querySelector('h1'); if (!el) return null; const s = getComputedStyle(el); return { font: s.fontFamily, size: s.fontSize, weight: s.fontWeight, color: s.color, lineHeight: s.lineHeight }; })(),
-  h2: (() => { const el = document.querySelector('h2'); if (!el) return null; const s = getComputedStyle(el); return { font: s.fontFamily, size: s.fontSize, weight: s.fontWeight, color: s.color }; })(),
+  h1: (() => {
+    const el = document.querySelector('h1');
+    if (!el) return null;
+    const s = getComputedStyle(el);
+    // Also check child em/span — they may override color via a class (e.g. text-gold).
+    // getComputedStyle(el).color returns the inherited value on the parent element only.
+    const child = el.querySelector('em, span');
+    const cs = child ? getComputedStyle(child) : null;
+    return { font: s.fontFamily, size: s.fontSize, weight: s.fontWeight, color: s.color, lineHeight: s.lineHeight,
+             childTag: child ? child.tagName : null, childColor: cs ? cs.color : null, childStyle: cs ? cs.fontStyle : null };
+  })(),
+  h2: (() => { const el = document.querySelector('h2'); if (!el) return null; const s = getComputedStyle(el); const child = el.querySelector('em,span'); const cs = child ? getComputedStyle(child) : null; return { font: s.fontFamily, size: s.fontSize, weight: s.fontWeight, color: s.color, childColor: cs ? cs.color : null }; })(),
   h3: (() => { const el = document.querySelector('h3'); if (!el) return null; const s = getComputedStyle(el); return { font: s.fontFamily, size: s.fontSize, weight: s.fontWeight, color: s.color }; })()
 }, null, 2)
 "
