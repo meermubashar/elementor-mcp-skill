@@ -399,6 +399,18 @@ Subhead text-editor    f3eda9f
 
 If you lose an ID, recover it with `elementor-mcp-get-page-structure` or `elementor-mcp-find-element`.
 
+## Form widget — native styling
+
+The Pro form widget has extensive native style controls. Use them before reaching for `add-custom-css`. Full reference, DOM-inspection workflow, atomic form limitations, and side-by-side field layout: **[`references/form-widget.md`](references/form-widget.md)**.
+
+Quick control map:
+- **Labels**: `label_color`, `label_spacing` (label→field gap), `label_typography_*`
+- **Fields**: `field_border_border: "solid"` (required to unlock), `field_border_color`, `field_border_width`, `field_border_radius`, `field_background_color`, `field_text_color`, `field_typography_*`
+- **Sizing**: `input_size` (xs/sm/md/lg/xl controls field height/padding), `row_gap`, `column_gap`
+- **Button**: `button_text_color`, `button_typography_*`, hover variants
+
+> ⚠️ `field_border_border: "solid"` must be set alongside `field_border_color`. Omitting the border type causes Elementor to skip CSS output entirely — the color alone has no effect.
+
 ## Anti-patterns to avoid
 
 | Anti-pattern | What to do instead |
@@ -424,6 +436,10 @@ If you lose an ID, recover it with `elementor-mcp-get-page-structure` or `elemen
 | Using `_padding` to set container padding | Use `padding` (no underscore). `_padding` is stored but silently ignored for rendered output — the container needs `--padding-top/bottom/left/right` CSS vars which only `padding` generates. See [Container padding](#container-padding--use-padding-not-_padding). |
 | Using an HTML widget for the copyright year line | Use a `heading` widget (tag `div`) with the `current-date-time` dynamic tag. Year auto-updates; text stays panel-editable. See [Dynamic tags](#dynamic-tags--outputting-live-data). |
 | Creating a Maintenance Mode template with `elementor-mcp-create-page` | Use `elementor-mcp-create-theme-template` — the template must be `post_type: elementor_library`. A regular `page` won't appear in Elementor's Maintenance Mode picker. See [`references/maintenance-mode.md`](references/maintenance-mode.md). |
+| Setting `field_border_color` on a form widget without setting `field_border_border` | Set `field_border_border: "solid"` in the same call. Elementor skips the border CSS entirely if the border type is unset — the color has no visible effect. |
+| Attempting to build a working atomic form (email/storage) via standalone atomic widgets | Atomic form widgets (`e-form-input`, `e-form-label`, etc.) are **purely presentational** — no submission handling, no actions. Their MCP schemas are completely empty. The only native path to atomic rendering with working submission is the "Use Atomic Form" panel toggle on the regular `form` widget, which is NOT accessible via MCP. Use the regular `form` widget for all production forms. See [`references/form-widget.md`](references/form-widget.md#atomic-forms--definitive-findings-do-not-retry-without-new-information). |
+| A flex grow-child wrapping to the next row instead of sharing the row | Elementor's default gives flex children `flex-shrink: 0; flex-basis: auto`, so `_flex_size: "grow"` alone doesn't help. Add element-level custom CSS: `selector { flex: 1 1 0% !important; min-width: 0; }` to force correct shrink/basis behavior. |
+| Using a FA6 icon name (e.g. `fa-location-dot`) with Elementor | Elementor ships with Font Awesome 5. FA6-only icons silently render as an empty circle. Use the FA5 equivalent (e.g. `fa-map-marker-alt`). See [`references/form-widget.md`](references/form-widget.md#font-awesome-version-note). |
 
 ## Key tool reference
 
@@ -446,5 +462,6 @@ If you lose an ID, recover it with `elementor-mcp-get-page-structure` or `elemen
 | Per-element or page-level custom CSS | `elementor-mcp-add-custom-css` (use `replace: true` to overwrite) |
 | Upload SVG icon for icon widgets | `elementor-mcp-upload-svg-icon` |
 | Build complete page from declarative spec | `elementor-mcp-build-page` (powerful but hard to iterate) |
+| Style a Pro form widget (labels, fields, borders, button) | `elementor-mcp-update-element` with native form controls — see [`references/form-widget.md`](references/form-widget.md) |
 
 ⭐ = the workhorse tool. If you're not calling `update-element` more than `add-custom-css`, you're probably still in HTML-widget muscle memory.
