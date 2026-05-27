@@ -51,16 +51,36 @@ button_typography_font_family
 button_typography_font_size
 button_typography_font_weight
 button_typography_letter_spacing
+button_typography_text_transform   # "uppercase", "none", etc.
+button_border_radius               # {top, right, bottom, left, unit, isLinked}
 ```
+
+### Widget Advanced (card) settings
+
+The form widget itself supports Elementor's standard Advanced-tab controls. Use these to give the form a card treatment — background color, border, and inner padding — without wrapping it in a separate container.
+
+```
+_background_background             # "classic" to enable solid background
+_background_color                  # card background color (hex/rgba)
+_border_border                     # "solid" — MUST set to enable border styling
+_border_color                      # card border color
+_border_width                      # {top, right, bottom, left, unit, isLinked}
+_border_radius                     # {top, right, bottom, left, unit, isLinked}
+_padding                           # inner padding: {top, right, bottom, left, unit, isLinked}
+```
+
+> ⚠️ `_border_border: "solid"` must be set alongside `_border_color`, same rule as field borders. And note that `_padding` here (on the widget's Advanced tab) IS correctly rendered — this is distinct from container `padding` vs `_padding`: on widgets, `_padding` is the right key for the Advanced padding control.
 
 > ⚠️ `field_border_border: "solid"` must be set alongside `field_border_color`. Setting color alone without the border type has no effect — Elementor skips the CSS output entirely.
 
 ## Reference-site form inspection workflow
 
-Before styling a form to match a reference, extract computed values from the live reference DOM. Run these `agent-browser eval` calls:
+Before styling a form to match a reference, extract computed values from the live reference DOM. **Use these exact eval recipes — do not write a hand-crafted subset.** Missing a single property (e.g. `textTransform`) means missing a styling detail you'll have to hand-correct later.
+
+Run all three `agent-browser eval` calls:
 
 ```js
-// Field, label, and wrapper computed styles
+// 1. Field, label, and wrapper computed styles
 (function() {
   var input = document.querySelector('input[type=text]');
   var label = document.querySelector('label');
@@ -81,22 +101,65 @@ Before styling a form to match a reference, extract computed values from the liv
   });
 })()
 
-// Select, textarea, submit button
+// 2. Select, textarea, submit button — full property set
 (function() {
   var sel = document.querySelector('select');
   var ta  = document.querySelector('textarea');
-  var btn = document.querySelector('button[type=submit]');
+  var btn = document.querySelector('button[type=submit], input[type=submit]');
   var ss = sel ? window.getComputedStyle(sel) : {};
   var ts = ta  ? window.getComputedStyle(ta)  : {};
   var bs = btn ? window.getComputedStyle(btn) : {};
   return JSON.stringify({
     select:   { borderColor: ss.borderColor, height: ss.height, paddingLeft: ss.paddingLeft },
     textarea: { borderColor: ts.borderColor, paddingTop: ts.paddingTop },
-    button:   { background: bs.backgroundColor, color: bs.color,
-                fontWeight: bs.fontWeight, letterSpacing: bs.letterSpacing }
+    button:   {
+      background: bs.backgroundColor, color: bs.color,
+      fontSize: bs.fontSize, fontWeight: bs.fontWeight,
+      letterSpacing: bs.letterSpacing, textTransform: bs.textTransform,
+      borderRadius: bs.borderRadius, padding: bs.padding
+    }
   });
 })()
+
+// 3. Form wrapper / card — walk up from <form> to find the first ancestor with a background
+// The <form> element itself is often transparent; the card is on a parent wrapper.
+(function() {
+  var form = document.querySelector('form');
+  var el = form ? form.parentElement : null;
+  while (el && el !== document.body) {
+    var s = window.getComputedStyle(el);
+    if (s.backgroundColor !== 'rgba(0, 0, 0, 0)' && s.backgroundColor !== 'transparent') {
+      return JSON.stringify({
+        tag: el.tagName,
+        className: el.className.slice(0, 80),
+        background: s.backgroundColor,
+        border: s.border,
+        borderRadius: s.borderRadius,
+        padding: s.padding
+      });
+    }
+    el = el.parentElement;
+  }
+  return JSON.stringify({ cardFound: false });
+})()
 ```
+
+> ⚠️ **Always run eval #3.** Checking `getComputedStyle(form).backgroundColor` on the `<form>` element itself almost always returns `rgba(0,0,0,0)` — transparent — because the card background is on a parent wrapper, not the form tag. Eval #3 walks up the DOM until it finds the element actually carrying the background. Missing this step means missing card background color, border, and padding entirely.
+
+**Also check field layout widths** — detect whether any fields are paired side-by-side in a 50/50 row:
+
+```js
+// 4. Field group layout — detect column arrangements
+JSON.stringify(
+  [...document.querySelectorAll('form .form-group, form .field-group, form [class*="field"]')].map(el => ({
+    label: el.querySelector('label')?.textContent?.trim().slice(0, 30),
+    width: window.getComputedStyle(el).width,
+    display: window.getComputedStyle(el).display
+  }))
+)
+```
+
+If any two adjacent fields render at roughly half the form width, set `"width": "50"` on those `form_fields` entries in Elementor.
 
 Map results directly to the native controls above. Key values found matching the precision-med brand:
 
