@@ -211,6 +211,57 @@ Set each field's `width` inside `form_fields` to `"50"` (percent string, not int
 "form_fields": [
   {"field_type": "text",  "field_label": "Full Name",     "width": "50"},
   {"field_type": "email", "field_label": "Email Address", "width": "50"},
-  {"field_type": "tel",   "field_label": "Phone Number",  "width": "100"}
+  {"field_type": "text",  "field_label": "Phone Number",  "width": "100"}
 ]
 ```
+
+## Phone masking — use `field_type: "text"`, not `"tel"`
+
+If you apply a `(XXX) XXX-XXXX` JS input mask to a phone field, **do not use `field_type: "tel"`**. Elementor Pro validates `tel` fields against the HTML5 tel character set — digits, `+`, `-`, `*`, `#` only. Parentheses and spaces in `(865) 603-0604` fail this check and produce the error: *"The field accepts only numbers and phone characters (#, -, *, etc.)"* — even though the value was correctly formatted by your script.
+
+**Fix:** set `field_type: "text"` on the phone field. Then restore the mobile numeric keyboard (which `type="tel"` normally triggers) by setting `inputmode="tel"` via JS on the input element itself.
+
+The `custom_id`-based DOM ID (`#form-field-phone`) is derived from `custom_id`, not `field_type` — it survives the type change unchanged, so no selector updates are needed.
+
+### Full phone masking implementation
+
+```js
+(function() {
+  function applyUSMask(input) {
+    var digits = input.value.replace(/\D/g, '').slice(0, 10);
+    if (!digits) { input.value = ''; return; }
+    var out = '(';
+    if (digits.length <= 3) {
+      out += digits;
+    } else if (digits.length <= 6) {
+      out += digits.slice(0, 3) + ') ' + digits.slice(3);
+    } else {
+      out += digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6);
+    }
+    input.value = out;
+  }
+
+  function initPhoneMask() {
+    var phoneInput = document.getElementById('form-field-phone');
+    if (!phoneInput) return;
+    phoneInput.setAttribute('inputmode', 'tel'); // numeric keyboard on mobile
+    phoneInput.addEventListener('input', function() {
+      applyUSMask(this);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPhoneMask);
+  } else {
+    initPhoneMask();
+  }
+})();
+```
+
+Deliver via `elementor-mcp-add-custom-js` appended to the root page container (position `-1`). The script is page-scoped, outputs in the footer, and the DOM is already rendered when it runs.
+
+| Setting | Value | Reason |
+|---|---|---|
+| `field_type` | `"text"` | Bypasses tel character-set validation |
+| `inputmode` (via JS) | `"tel"` | Restores numeric keyboard on mobile |
+| Selector | `#form-field-{custom_id}` | Set from `custom_id`, survives field type change |
