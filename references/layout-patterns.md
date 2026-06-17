@@ -50,3 +50,15 @@ If a section is built with HTML widgets and the user wants it refactored to nati
 6. Visual-review the section; iterate.
 
 This preserves the parent container's styling (background, padding, layout) and only swaps the content.
+
+## Widget background-color and border-radius bleed (rounded badges/pills)
+
+When applying both a background color and a border-radius directly to a native widget (like a pill-shaped eyebrow heading or an icon badge), Elementor sometimes splits the properties between different HTML elements (e.g., background on `.elementor-widget-container` and border-radius on the outer `.elementor-element` wrapper). This causes the background color to bleed out as a square corner on the inner container.
+
+**Fix**: Apply the background color to the inner container using scoped custom CSS:
+```css
+selector .elementor-widget-container {
+    background-color: var(--color-bg);
+}
+```
+Ensure you clear the widget's native `background_color` setting to prevent specificity conflicts.
