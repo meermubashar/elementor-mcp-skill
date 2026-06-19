@@ -1,23 +1,15 @@
 ---
 name: elementor-mcp
 description: >-
-  Use this skill whenever you are working with an Elementor or Elementor Pro
-  WordPress site via the Elementor MCP — recognizable by `mcp__*__elementor-mcp-*`
-  tools being available in the session, or by the user asking to create, edit,
-  refactor, or style a page on a WordPress site that uses Elementor (often with
-  the Hello Elementor theme). Teaches the fluent patterns for building pages
-  with native Elementor widgets (image, heading, text-editor, icon-box, container,
-  etc.) instead of falling back to HTML widgets; the two-step `add-*` then
-  `update-element` pattern for getting styling into Elementor's native data
-  model so it remains editable from the panel UI; the global kit / `__globals__`
-  strategy for brand consistency; common traps like `content_width: "boxed"`
-  collapsing flex layouts; the safe-svg upload-roles gate; and the agent-browser
-  visual-review loop. Trigger even when the user doesn't say "Elementor MCP"
-  explicitly — if Elementor MCP tools are available in the session, this skill
-  applies to any page-building, page-editing, or page-refactoring task on that
-  site. Also trigger when the user mentions building a landing page, sales
-  page, one-sheet, or pitch-deck-style page on a WordPress site that uses
-  Elementor.
+  Use this skill for Elementor or Elementor Pro WordPress sites when Elementor
+  MCP tools are available (`mcp__*__elementor-mcp-*`) or the user asks to build,
+  edit, refactor, or style pages in Elementor. Prefer native Elementor widgets
+  (image, heading, text-editor, icon-box, container, etc.) and the two-step
+  `add-*` then `update-element` workflow so layouts stay editable in the panel.
+  Emphasize global kit / `__globals__` consistency, avoid boxed content width
+  flex-collapse issues, handle safe SVG uploads, and support visual review via
+  agent/browser. Trigger on landing pages, sales pages, one-sheets, or pitch-
+  deck-style Elementor work even without the explicit tool name.
 ---
 
 # Elementor MCP — fluent page building
@@ -452,6 +444,10 @@ Quick control map:
 | Using `field_type: "tel"` on a phone field that has a JS input mask | Elementor Pro validates `tel` fields against the HTML5 tel character set — parentheses and spaces in `(555) 123-4567` fail and show a validation error. Use `field_type: "text"` instead, then restore the mobile numeric keyboard via JS: `phoneInput.setAttribute('inputmode', 'tel')`. The field's DOM ID (from `custom_id`) is unaffected by the type change. See [`references/form-widget.md`](references/form-widget.md#phone-masking--use-field_type-text-not-tel). |
 | Defining a WP REST endpoint with `custom_id`-based arg names for an Elementor webhook | Elementor sends field **labels** as keys (spaces → underscores via PHP `parse_str`), NOT `custom_id` values. A field labelled "Work Email" arrives as `Work_Email`. WP REST validates required args *before* the callback runs — a key mismatch returns a silent 400 and your debug `error_log()` calls are never reached. Register args using label-derived keys and use `rest_pre_dispatch` to inspect raw params during debugging. See [`references/form-widget.md`](references/form-widget.md#elementor-form-webhook-payload-format). |
 | Placing a JS HTML widget at the page root level when it targets a specific section | JS interaction scripts (masking, show/hide, etc.) should be positioned **adjacent to the element they target** in the Elementor Navigator, not floating at the root. Root-level placement makes the dependency invisible to future editors and the widget becomes orphaned if the section is moved. Also name the widget in the Navigator (`_title: "Phone Mask Script"`) so its purpose is immediately obvious. See [`references/form-widget.md`](references/form-widget.md#js-widget--navigator-naming-and-placement). |
+| Omitting underscore prefix on widget advanced settings (`border_radius`, `background_color`) or adding them to containers | Advanced tab settings on **widgets** (like border-radius, background-color, margins, padding) require the leading underscore prefix (e.g. `_border_radius`, `_background_color`). The same settings on **containers** (Flexbox/Grid) must not have an underscore. Guessing wrong is silently accepted by Elementor and silently does nothing. |
+| Referencing CSS custom variables in Custom CSS without checking their definition in the theme stylesheet | If a variable (like `--shadow-soft`) is referenced in custom CSS, verify it is enqueued in both `:root` (light mode) and `[data-theme="dark"]` (dark mode) in the active theme's stylesheet (e.g., `frontend.css`). Omitted variables in either block will cause the style to resolve to `none`/transparent in that mode. |
+| Setting extremely tight heading line-height (`1.05em`) and letter-spacing (`-0.04em`) without enqueued font files | If custom fonts (like `Inter`) fail to load or are not enqueued, the browser wraps lines and renders text using default system font fallbacks (like Arial). Wider fallbacks will collide and overlap. Always set a safe line-height margin (at least `1.15em` to `1.2em` for multi-line headings) to buffer fallback rendering. |
+
 
 ## Key tool reference
 
